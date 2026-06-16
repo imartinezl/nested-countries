@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nested-countries"
+version = "0.1.0"
+description = "Solver for the Nested Countries Challenge: longest chain of countries that nest inside one another by translation and rotation only."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Nested Countries" }]
+keywords = ["geospatial", "shapely", "geopandas", "containment", "natural-earth"]
+
+dependencies = [
+    "geopandas>=1.0",
+    "shapely>=2.0",
+    "pyproj>=3.4",
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "networkx>=3.0",
+    "matplotlib>=3.7",
+    "plotly>=5.18",
+    "jinja2>=3.1",
+    "tqdm>=4.65",
+    "pyogrio>=0.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+# Optional spatial-index acceleration. Shapely 2.x already vendors the
+# vectorized GEOS engine (the old "pygeos" project), so it is not listed here.
+speed = [
+    "rtree>=1.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nested_countries"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

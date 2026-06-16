@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nested Countries · Interactive Explorer</title>
+<meta name="description" content="The longest chain of countries that nest inside one another by rotation and translation only - interactive explorer built on Natural Earth data.">
+<link rel="icon" type="image/svg+xml" href="{{ favicon }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<style>
+  :root{
+    --bg:#080c18; --bg2:#0d1326; --panel:#111a30; --panel2:#0c1426;
+    --line:#1e2a44; --ink:#e8eef9; --mut:#8da0c2; --mut2:#5e6f92;
+    --cyan:#39e0c4; --blue:#7aa2ff; --violet:#b388ff; --pink:#ff77b0; --gold:#ffd166;
+    --ok:#39e0c4; --bad:#ff6b81; --warn:#ffba5c;
+    --head:'Exo 2',-apple-system,Segoe UI,Roboto,sans-serif;
+    --body:'Inter',-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#16213f 0%,var(--bg) 55%);
+    color:var(--ink);font-family:var(--body);line-height:1.5}
+  a{color:var(--cyan);text-decoration:none} a:hover{text-decoration:underline}
+  h1,h2,h3{font-family:var(--head);letter-spacing:.2px}
+  .wrap{max-width:1220px;margin:0 auto;padding:0 20px 60px}
+  header{padding:40px 20px 26px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(57,224,196,.06),transparent)}
+  header .inner{max-width:1220px;margin:0 auto}
+  .brand{display:flex;align-items:center;gap:16px}
+  .logo{flex:none;width:52px;height:52px;filter:drop-shadow(0 4px 12px rgba(57,224,196,.25))}
+  h1{margin:0;font-size:30px;font-weight:800}
+  h1 .accent{background:linear-gradient(90deg,var(--cyan),var(--blue) 55%,var(--violet));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--mut);margin-top:6px;font-size:14px;max-width:820px}
+  .chips{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;min-width:118px}
+  .chip .n{font-family:var(--head);font-size:24px;font-weight:800;color:var(--cyan);font-variant-numeric:tabular-nums}
+  .chip .l{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.6px;margin-top:2px}
+  section{margin-top:34px}
+  .shead{display:flex;align-items:baseline;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+  .shead h2{font-size:19px;margin:0;font-weight:700}
+  .shead .tag{font-size:11px;color:var(--mut2);text-transform:uppercase;letter-spacing:.7px}
+  .panel{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+    border-radius:16px;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+  .explorer{display:grid;grid-template-columns:360px 1fr;gap:18px}
+  @media(max-width:900px){.explorer{grid-template-columns:1fr}}
+  .ctrl label{font-size:12px;color:var(--mut);display:block;margin:14px 0 6px}
+  .row{display:flex;gap:8px}
+  input[type=text]{flex:1;background:#0a1124;border:1px solid var(--line);color:var(--ink);
+    border-radius:10px;padding:10px 12px;font-size:14px;outline:none;font-family:var(--body)}
+  input[type=text]:focus{border-color:var(--cyan)}
+  button{background:#15203c;border:1px solid var(--line);color:var(--ink);border-radius:10px;
+    padding:9px 12px;font-size:13px;cursor:pointer;transition:.12s;font-family:var(--body)}
+  button:hover{border-color:var(--cyan);color:var(--cyan)}
+  button.primary{background:linear-gradient(90deg,var(--cyan),var(--blue));color:#04121a;border:none;font-weight:700}
+  button.ghost{background:transparent}
+  button.mini{padding:4px 9px;font-size:12px}
+  .pillrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .pillrow button{font-size:12px;padding:6px 10px}
+  .toggle{display:flex;align-items:center;gap:9px;margin-top:6px;font-size:13px;color:var(--mut)}
+  .switch{position:relative;width:42px;height:22px;background:#1b2748;border-radius:20px;cursor:pointer;border:1px solid var(--line)}
+  .switch .knob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--mut);transition:.18s}
+  .switch.on{background:linear-gradient(90deg,var(--cyan),var(--blue))}
+  .switch.on .knob{left:22px;background:#04121a}
+  .chainlist{margin-top:12px;max-height:300px;overflow:auto}
+  .ci{display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:9px;margin-bottom:5px;
+    background:#0b1326;border:1px solid var(--line);font-size:13px;cursor:pointer}
+  .ci.sel{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan) inset}
+  .ci .ord{display:flex;flex-direction:column;line-height:.7;color:var(--mut2)}
+  .ci .ord span{cursor:pointer;font-size:10px;padding:1px}
+  .ci .ord span:hover{color:var(--cyan)}
+  .ci .sw{width:12px;height:12px;border-radius:3px;flex:none}
+  .ci .nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ci .lk{font-size:11px;font-variant-numeric:tabular-nums;flex:none}
+  .ci .lk.ok{color:var(--ok)} .ci .lk.bad{color:var(--bad)} .ci .lk.man{color:var(--gold)}
+  .ci .x{cursor:pointer;color:var(--mut2);font-weight:700;flex:none}
+  .ci .x:hover{color:var(--bad)}
+  .controls{margin-top:12px;padding:12px;border-radius:11px;background:#0b1326;border:1px solid var(--cyan)}
+  .controls .hd{font-size:12px;color:var(--mut);margin-bottom:8px}
+  .controls .hd b{color:var(--ink)}
+  .controls .grp{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .controls .pad{display:grid;grid-template-columns:repeat(3,32px);grid-template-rows:repeat(3,26px);gap:4px}
+  .controls .pad button{padding:0}
+  .controls .pad .sp{visibility:hidden}
+  .controls .rot{display:flex;gap:5px}
+  .controls .meta{margin-top:8px;font-size:11.5px;color:var(--mut);font-variant-numeric:tabular-nums}
+  .status{margin-top:12px;padding:12px;border-radius:11px;background:#0b1326;border:1px solid var(--line);font-size:13px}
+  .status b{color:var(--cyan)}
+  .nestwrap{position:relative;min-height:520px}
+  #nest{width:100%;height:560px;display:block;background:
+    radial-gradient(900px 500px at 50% 40%,rgba(57,224,196,.05),transparent),#070b16;
+    border:1px solid var(--line);border-radius:12px}
+  .nestbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:12px;color:var(--mut);gap:10px}
+  .nestbar .right{display:flex;align-items:center;gap:10px}
+  .legend{position:absolute;right:14px;top:54px;background:rgba(10,17,36,.85);border:1px solid var(--line);
+    border-radius:10px;padding:8px 10px;max-height:440px;overflow:auto;font-size:11.5px;backdrop-filter:blur(4px)}
+  .legend div{display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer;white-space:nowrap}
+  .legend .sw{width:10px;height:10px;border-radius:2px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-weight:600;text-transform:uppercase;font-size:10.5px;letter-spacing:.5px}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+  .card{background:var(--panel2);border:1px solid var(--line);border-radius:13px;padding:12px;cursor:pointer;transition:.15s}
+  .card:hover{border-color:var(--cyan);transform:translateY(-2px)}
+  .card svg{width:100%;height:130px;display:block}
+  .card .meta{display:flex;justify-content:space-between;margin-top:8px;font-size:12px;color:var(--mut)}
+  .card .len{color:var(--cyan);font-weight:700;font-family:var(--head)}
+  .card .nm{font-size:11.5px;color:var(--mut2);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .netcap{font-size:12.5px;color:var(--mut);margin-bottom:10px}
+  .netcap b{color:var(--ink)}
+  /* step-by-step builder */
+  .bbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .bbtns{display:flex;gap:8px;flex:none}
+  .crumb{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:13px}
+  .crumb .step{background:#0b1326;border:1px solid var(--line);border-radius:8px;padding:4px 9px;cursor:pointer}
+  .crumb .step:hover{border-color:var(--cyan);color:var(--cyan)}
+  .crumb .step.last{border-color:var(--cyan);color:var(--cyan)}
+  .crumb .arr{color:var(--mut2)}
+  .crumb .empty{color:var(--mut)}
+  .brow{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .brow input{max-width:280px}
+  .muted{color:var(--mut2);font-size:12px}
+  .candgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:8px;max-height:430px;overflow:auto;padding-right:4px}
+  .cand{display:flex;align-items:center;gap:9px;background:#0b1326;border:1px solid var(--line);border-radius:10px;
+    padding:8px 10px;cursor:pointer;transition:.12s}
+  .cand:hover{border-color:var(--cyan);transform:translateY(-1px)}
+  .cand .dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .cand .cn{flex:1;min-width:0}
+  .cand .cnm{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cand .cmeta{font-size:10.5px;color:var(--mut2);font-variant-numeric:tabular-nums}
+  .cand .plus{color:var(--mut2);font-weight:700}
+  .cand:hover .plus{color:var(--cyan)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:900px){.two{grid-template-columns:1fr}}
+  .lead{font-size:12.5px}
+  .lead .bar{display:flex;align-items:center;gap:8px;margin:4px 0}
+  .lead .bar .fill{height:14px;border-radius:4px;background:linear-gradient(90deg,var(--cyan),var(--blue))}
+  .lead .bar .lbl{flex:none;width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lead .bar .v{flex:none;width:34px;text-align:right;color:var(--mut);font-variant-numeric:tabular-nums}
+  #net{width:100%;height:520px;background:#070b16;border:1px solid var(--line);border-radius:12px}
+  .tip{position:fixed;pointer-events:none;background:#0a1124;border:1px solid var(--cyan);border-radius:8px;
+    padding:7px 10px;font-size:12px;opacity:0;transition:.1s;z-index:50;max-width:240px}
+  .docs{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:900px){.docs{grid-template-columns:1fr}}
+  .doc{background:var(--panel2);border:1px solid var(--line);border-radius:13px;padding:16px 18px}
+  .doc h3{margin:0 0 8px;font-size:15px;color:var(--cyan)}
+  .doc p,.doc li{font-size:13px;color:var(--mut);margin:6px 0}
+  .doc b{color:var(--ink)}
+  .doc code{background:#0a1124;border:1px solid var(--line);padding:1px 6px;border-radius:5px;font-size:12px;color:#cfe}
+  .doc ul{padding-left:18px;margin:6px 0}
+  .doc.span2{grid-column:1 / -1}
+  .params{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .params span{background:#0a1124;border:1px solid var(--line);border-radius:20px;padding:4px 11px;font-size:12px;color:var(--mut)}
+  .params b{color:var(--cyan)}
+  .foot{margin-top:46px;color:var(--mut2);font-size:12.5px;border-top:1px solid var(--line);padding-top:18px}
+  .axis path,.axis line{stroke:var(--line)} .axis text{fill:var(--mut);font-size:10px}
+</style>
+</head>
+<body>
+<header><div class="inner">
+  <div class="brand">
+    <span class="logo"><svg viewBox="0 0 64 64" width="52" height="52" xmlns="http://www.w3.org/2000/svg">
+      <rect width="64" height="64" rx="13" fill="#0c1426"/>
+      <rect x="9" y="9" width="46" height="46" rx="10" fill="none" stroke="#39e0c4" stroke-width="3"/>
+      <rect x="19" y="19" width="26" height="26" rx="6" fill="none" stroke="#7aa2ff" stroke-width="3"/>
+      <rect x="27.5" y="27.5" width="9" height="9" rx="2.5" fill="#b388ff"/>
+    </svg></span>
+    <div>
+      <h1><span class="accent">Nested Countries</span> · Interactive Explorer</h1>
+      <div class="sub">The longest chain of countries that fit fully inside one another using only
+        rotation and translation. Build your own chain, reorder it, or hand-place
+        countries to see why some refuse to fit. Strict containment with a {{ meta.epsilon_km }} km clearance buffer.</div>
+    </div>
+  </div>
+  <div class="chips">
+    <div class="chip"><div class="n" id="chipLong">{{ meta.longestAll }}</div><div class="l">Longest chain</div></div>
+    <div class="chip"><div class="n">{{ meta.nCountries }}</div><div class="l">Countries</div></div>
+    <div class="chip"><div class="n">{{ "{:,}".format(meta.nEdges) }}</div><div class="l">Valid nestings</div></div>
+    <div class="chip"><div class="n">{{ "{:,}".format(meta.nPairs) }}</div><div class="l">Pairs tested</div></div>
+  </div>
+</div></header>
+
+<div class="wrap">
+
+  <!-- EXPLORER -->
+  <section>
+    <div class="shead"><h2>Nesting Explorer</h2><span class="tag">build · reorder · hand-place</span></div>
+    <div class="explorer">
+      <div class="panel ctrl">
+        <div class="toggle">
+          <div class="switch" id="sovSwitch"><div class="knob"></div></div>
+          <span id="sovLabel">Sovereign states only</span>
+        </div>
+        <label>Add a country to the chain</label>
+        <div class="row">
+          <input type="text" id="search" list="countryList" placeholder="Type a country…" autocomplete="off">
+          <button class="primary" id="addBtn">Add</button>
+        </div>
+        <datalist id="countryList"></datalist>
+        <div class="pillrow">
+          <button id="loadLongest">★ Load longest</button>
+          <button class="ghost" id="clearBtn">Clear</button>
+        </div>
+        <div class="chainlist" id="chainList"></div>
+        <div class="controls" id="controls" style="display:none"></div>
+        <div class="status" id="status"></div>
+      </div>
+
+      <div class="nestwrap panel" style="padding:14px">
+        <div class="nestbar">
+          <span id="nestTitle">—</span>
+          <span class="right"><button class="mini" id="dlBtn">⤓ Download PNG</button>
+            <span>scroll to zoom · drag to pan</span></span>
+        </div>
+        <svg id="nest"></svg>
+        <div class="legend" id="legend"></div>
+        <div style="overflow:auto;margin-top:12px">
+          <table id="linkTable"><thead><tr>
+            <th>#</th><th>Outer → Inner</th><th>Fit</th><th>Source</th>
+            <th class="num">angle°</th><th class="num">dx</th><th class="num">dy</th><th class="num">clear km</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TOP CHAINS -->
+  <section>
+    <div class="shead"><h2>Top Chains</h2><span class="tag">click a card to load it</span></div>
+    <div class="gallery" id="gallery"></div>
+  </section>
+
+  <!-- STEP-BY-STEP BUILDER -->
+  <section>
+    <div class="shead"><h2>Build step-by-step</h2><span class="tag">pick the next country that fits</span></div>
+    <div class="panel">
+      <div class="bbar">
+        <div id="crumb" class="crumb"></div>
+        <div class="bbtns">
+          <button id="backBtn">← Back</button>
+          <button class="ghost" id="clearBtn2">Clear chain</button>
+        </div>
+      </div>
+      <div class="brow">
+        <input type="text" id="candSearch" placeholder="Filter options…" autocomplete="off">
+        <span id="candCount" class="muted"></span>
+      </div>
+      <div class="candgrid" id="builder"></div>
+    </div>
+  </section>
+
+  <!-- CHARTS -->
+  <section>
+    <div class="shead"><h2>Insights</h2><span class="tag">size ladder · clearances · leaderboards</span></div>
+    <div class="two">
+      <div class="panel"><div class="shead"><h2 style="font-size:15px">Size ladder of current chain</h2></div>
+        <svg id="ladder" style="width:100%;height:280px"></svg></div>
+      <div class="panel"><div class="shead"><h2 style="font-size:15px">Edge clearance distribution</h2></div>
+        <svg id="hist" style="width:100%;height:280px"></svg></div>
+    </div>
+    <div class="two" style="margin-top:18px">
+      <div class="panel"><div class="shead"><h2 style="font-size:15px">Best containers</h2>
+        <span class="tag">fit the most others</span></div><div class="lead" id="leadOut"></div></div>
+      <div class="panel"><div class="shead"><h2 style="font-size:15px">Most containable</h2>
+        <span class="tag">fit inside the most</span></div><div class="lead" id="leadIn"></div></div>
+    </div>
+  </section>
+
+  <!-- DOCUMENTATION -->
+  <section>
+    <div class="shead"><h2>Documentation</h2><span class="tag">data · method · computation</span></div>
+    <div class="docs">
+
+      <div class="doc span2">
+        <h3>The challenge</h3>
+        <p>Given the real-world boundary of every country, find the longest sequence
+          <code>A₁ → A₂ → … → Aₙ</code> such that each <code>Aᵢ₊₁</code> can be placed
+          <b>fully inside</b> <code>Aᵢ</code>. The only allowed moves are <b>rotation</b> and
+          <b>translation</b> — <b>no scaling</b>, so every country keeps its true size. Containment is
+          <b>strict</b>: the inner boundary may not touch the outer one. We enforce this with an inward
+          buffer, requiring <code>outer.buffer(−{{ meta.epsilon_km }} km).contains(inner)</code>.</p>
+        <div class="params">
+          <span>longest (all): <b>{{ meta.longestAll }}</b></span>
+          <span>longest (sovereign): <b>{{ meta.longestSov }}</b></span>
+          <span>countries: <b>{{ meta.nCountries }}</b></span>
+          <span>valid edges: <b>{{ "{:,}".format(meta.nEdges) }}</b></span>
+          <span>pairs tested: <b>{{ "{:,}".format(meta.nPairs) }}</b></span>
+        </div>
+      </div>
+
+      <div class="doc">
+        <h3>Data</h3>
+        <ul>
+          <li>Source: <b>{{ meta.dataset }}</b> — the public-domain
+            <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a>
+            1:10m Admin-0 countries layer.</li>
+          <li>Geometry mode: <b>{{ meta.mode }}</b> — only each country's largest contiguous landmass is
+            kept (islands/exclaves dropped), which makes nesting strictly harder but unambiguous.</li>
+          <li>Each country is re-projected into its <b>own local Lambert azimuthal equal-area CRS</b>
+            (centred on the country, units of km) so that areas and shapes are faithful where it matters.
+            A single global projection would distort comparisons badly.</li>
+          <li>“Sovereign states only” uses Natural Earth’s feature <code>TYPE</code> to hide
+            dependencies and territories.</li>
+        </ul>
+      </div>
+
+      <div class="doc">
+        <h3>Containment method</h3>
+        <p>For each ordered pair we ask: can the inner country be rotated and translated to sit strictly
+          inside the outer one? The solver runs a staged search:</p>
+        <ul>
+          <li><b>Safe rejection</b> — if the inner’s area or diameter exceeds the outer’s, it is
+            <i>provably</i> impossible (the only certain “no”).</li>
+          <li><b>Rotation sweep</b> — orientations in steps of {{ meta.angleStep }}°, visited in a spread
+            order so a capped search still samples the whole circle.</li>
+          <li><b>Translation search</b> — candidate positions on a {{ meta.gridStep }} km interior grid
+            (auto-refined for small countries), then local refinement to maximise clearance.</li>
+        </ul>
+        <p>A pair is an <b>edge</b> only if a concrete placement clearing {{ meta.epsilon_km }} km is
+          found. A missing edge is <b>search-dependent</b>, never a proof of impossibility.</p>
+      </div>
+
+      <div class="doc">
+        <h3>Computation</h3>
+        <ul>
+          <li>All <b>{{ "{:,}".format(meta.nPairs) }}</b> ordered country pairs were evaluated
+            (only inner-smaller-than-outer pairs are tested).</li>
+          <li>For speed the search ran on size-adaptive simplified geometry
+            (~{{ meta.simplifyKm }} km tolerance){% if meta.maxCandidates %}, capped at
+            {{ meta.maxCandidates }} placement tests per pair{% endif %};
+            rotation {% if meta.rotation %}<b>enabled</b>{% else %}<b>disabled</b>{% endif %}.</li>
+          <li>Every discovered placement is then <b>re-validated on the full-resolution geometry</b>, so
+            each of the <b>{{ "{:,}".format(meta.nEdges) }}</b> edges shown genuinely respects the strict
+            buffer.</li>
+          <li>The valid edges form a directed acyclic graph (area always decreases). The longest chain is
+            the <b>longest path</b>, found exactly by dynamic programming.</li>
+        </ul>
+      </div>
+
+      <div class="doc">
+        <h3>How to read the explorer</h3>
+        <ul>
+          <li>Countries are drawn <b>nested inside the first</b>, using the exact rotation/translation the
+            solver found; the outermost is faint, inner ones brighter.</li>
+          <li>Reorder with ▲▼, remove with ✕, and click a country to <b>hand-place</b> it: rotate by
+            {{ meta.angleStep }}° and nudge by {{ meta.gridStep }} km. Green = inside, red = overlaps.</li>
+          <li><b>Build step-by-step</b> guides you one country at a time: it lists every country that
+            fits inside the current last one (with its clearance). Click to extend, click a breadcrumb
+            step to jump back, or use Back / Clear. The size ladder and nesting map update as you go.</li>
+        </ul>
+      </div>
+
+      <div class="doc span2">
+        <h3>Caveats</h3>
+        <ul>
+          <li><b>Projection sensitivity.</b> Very large countries (Russia, Canada, USA, China, Brazil) are
+            distorted by any planar projection; treat chains through them as approximate.</li>
+          <li><b>Resolution.</b> Results depend on the 1:10m generalisation of coastlines and borders.
+            The maps you see here are display-simplified; validity was computed on the full geometry.</li>
+          <li><b>Search-dependent negatives.</b> Apart from area/diameter rejections, a “does not fit”
+            result reflects the search budget, not a mathematical impossibility — a finer sweep may still
+            find a placement.</li>
+          <li><b>Hand-placement feedback</b> is geometric (on the simplified outline) and approximate near
+            the boundary; the authoritative ≥{{ meta.epsilon_km }} km fit is the solver edge.</li>
+        </ul>
+      </div>
+
+    </div>
+    <div class="foot">
+      Boundary data © <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a>
+      (public domain). An exploratory, search-based project — see the caveats above. Built with D3.
+    </div>
+  </section>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<script>
+const DATA = {{ data_json | safe }};
+const C = DATA.countries, ADJ = DATA.adj;
+const STEP_ANG = +DATA.meta.angleStep || 5;
+const STEP_KM  = +DATA.meta.gridStep  || 25;
+const tip = document.getElementById('tip');
+
+const outDeg={}, inDeg={};
+for(const o in ADJ){ outDeg[o]=Object.keys(ADJ[o]).length;
+  for(const i in ADJ[o]){ inDeg[i]=(inDeg[i]||0)+1; } }
+
+const PALETTE=['#39e0c4','#7aa2ff','#b388ff','#ff77b0','#ffd166','#5be0a0','#ff9f7a','#69c0ff'];
+function color(i,n){ return d3.interpolateRgbBasis(PALETTE)(n<=1?0:i/(n-1)); }
+function nm(id){ return C[id]?C[id].name:id; }
+function ar(id){ return C[id]?C[id].area:0; }
+function edge(a,b){ return (ADJ[a]&&ADJ[a][b])?ADJ[a][b]:null; }
+function fmt(x){ return d3.format(",")(Math.round(x)); }
+
+let sovereignOnly=false;
+let chain = (DATA.chainsAll[0]?DATA.chainsAll[0].ids.slice():[]);
+let manual = {};
+let selected = -1;
+
+// ============ transforms ============
+function compose(A, loc){ const r=A.ang*Math.PI/180, c=Math.cos(r), s=Math.sin(r);
+  return {ang:A.ang+loc.ang, tx:c*loc.tx - s*loc.ty + A.tx, ty:s*loc.tx + c*loc.ty + A.ty}; }
+function applyT(T,p){ const r=T.ang*Math.PI/180, c=Math.cos(r), s=Math.sin(r);
+  return [c*p[0]-s*p[1]+T.tx, s*p[0]+c*p[1]+T.ty]; }
+function localT(i){ if(manual[i]) return manual[i];
+  const e=edge(chain[i-1],chain[i]); if(e) return {ang:e[0],tx:e[1],ty:e[2]};
+  return {ang:0,tx:0,ty:0}; }
+function cumT(){ const T=[{ang:0,tx:0,ty:0}];
+  for(let i=1;i<chain.length;i++) T.push(compose(T[i-1],localT(i))); return T; }
+function autoT(ids){ const T=[{ang:0,tx:0,ty:0}];
+  for(let i=1;i<ids.length;i++){ const e=edge(ids[i-1],ids[i]); if(!e)break;
+    T.push(compose(T[i-1],{ang:e[0],tx:e[1],ty:e[2]})); } return T; }
+
+// ============ client-side containment (hand-placement feedback) ============
+function pip(p,ring){ let x=p[0],y=p[1],ins=false;
+  for(let i=0,j=ring.length-1;i<ring.length;j=i++){ const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];
+    if(((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi)) ins=!ins; } return ins; }
+function insideAny(p,rings){ for(const r of rings) if(pip(p,r)) return true; return false; }
+function ccw(a,b,c){ return (c[1]-a[1])*(b[0]-a[0]) > (b[1]-a[1])*(c[0]-a[0]); }
+function segInt(a,b,c,d){ return ccw(a,c,d)!==ccw(b,c,d) && ccw(a,b,c)!==ccw(a,b,d); }
+function geomFits(i){ const inner=C[chain[i]],outer=C[chain[i-1]]; if(!inner||!outer)return false;
+  const T=localT(i); const placed=inner.rings.map(r=>r.map(p=>applyT(T,p)));
+  for(const ring of placed) for(const p of ring) if(!insideAny(p,outer.rings)) return false;
+  for(const ir of placed) for(let a=0;a<ir.length-1;a++){ const p1=ir[a],p2=ir[a+1];
+    for(const orr of outer.rings) for(let b=0;b<orr.length-1;b++) if(segInt(p1,p2,orr[b],orr[b+1])) return false; }
+  return true; }
+function linkStatus(i){ if(manual[i]) return {src:'manual',fits:geomFits(i),clr:null};
+  const e=edge(chain[i-1],chain[i]); if(e) return {src:'solver',fits:true,clr:e[3]};
+  return {src:'none',fits:geomFits(i),clr:null}; }
+
+// ============ nesting render ============
+const nestSvg=d3.select('#nest'); let nestG=nestSvg.append('g');
+const zoom=d3.zoom().scaleExtent([0.3,60]).on('zoom',ev=>nestG.attr('transform',ev.transform));
+nestSvg.call(zoom);
+function ringPath(ring,T){ let d=''; for(let i=0;i<ring.length;i++){ const q=applyT(T,ring[i]);
+  d+=(i?'L':'M')+q[0].toFixed(1)+','+q[1].toFixed(1); } return d+'Z'; }
+
+function renderNest(){
+  const ids=chain, T=cumT();
+  document.getElementById('nestTitle').textContent =
+    ids.length? nm(ids[0])+'  ('+ids.length+' countries)' : '—';
+  nestG.selectAll('*').remove();
+  const leg=d3.select('#legend'); leg.selectAll('*').remove();
+  if(!ids.length) return;
+
+  let minx=1e15,miny=1e15,maxx=-1e15,maxy=-1e15;
+  for(let i=0;i<ids.length;i++){ const cc=C[ids[i]]; if(!cc)continue;
+    for(const ring of cc.rings) for(const p of ring){ const q=applyT(T[i],p);
+      if(q[0]<minx)minx=q[0]; if(q[0]>maxx)maxx=q[0]; if(q[1]<miny)miny=q[1]; if(q[1]>maxy)maxy=q[1]; } }
+  const W=nestSvg.node().clientWidth, H=nestSvg.node().clientHeight;
+  const w=Math.max(maxx-minx,1), h=Math.max(maxy-miny,1), s=Math.min(W/w,H/h)*0.9;
+  const ox=(W-s*(minx+maxx))/2, oy=(H+s*(miny+maxy))/2;   // y flipped -> north up
+  nestSvg.call(zoom.transform, d3.zoomIdentity);
+  nestG.attr('transform','');
+  const view=nestG.append('g').attr('transform',`translate(${ox},${oy}) scale(${s},${-s})`);
+
+  for(let i=0;i<ids.length;i++){ const cc=C[ids[i]]; if(!cc)continue;
+    const col=color(i,ids.length); const st = i>0?linkStatus(i):{src:'base',fits:true};
+    const bad = i>0 && !st.fits;
+    let d=''; for(const ring of cc.rings) d+=ringPath(ring,T[i]);
+    view.append('path').attr('d',d)
+      .attr('fill',bad?'#ff6b81':col).attr('fill-opacity',i===0?0.05:(bad?0.20:0.16))
+      .attr('stroke',bad?'#ff6b81':(i===selected?'#ffffff':col))
+      .attr('vector-effect','non-scaling-stroke')
+      .attr('stroke-width',1.4).attr('stroke-dasharray',bad?'5 3':null)
+      .attr('stroke-linejoin','round').attr('class','poly').attr('data-i',i).style('cursor','pointer')
+      .on('click',()=>selectIdx(i))
+      .on('mousemove',ev=>showTip(ev, (i+1)+'. '+nm(ids[i])+'<br>'+fmt(ar(ids[i]))+' km²'+(bad?'<br><span style="color:#ff6b81">overlaps boundary</span>':'')))
+      .on('mouseout',hideTip);
+    const row=leg.append('div').on('click',()=>selectIdx(i));
+    row.append('span').attr('class','sw').style('background',bad?'#ff6b81':col);
+    row.append('span').text((i+1)+'. '+nm(ids[i])+(bad?' ✗':''));
+  }
+}
+
+// ============ download PNG ============
+function downloadNest(){
+  const svg=document.getElementById('nest'); const W=svg.clientWidth||900, H=svg.clientHeight||560;
+  const NS='http://www.w3.org/2000/svg';
+  const clone=svg.cloneNode(true);
+  clone.setAttribute('xmlns',NS); clone.setAttribute('width',W); clone.setAttribute('height',H);
+  const bg=document.createElementNS(NS,'rect'); bg.setAttribute('width',W); bg.setAttribute('height',H); bg.setAttribute('fill','#070b16');
+  clone.insertBefore(bg,clone.firstChild);
+  const ttl=document.createElementNS(NS,'text'); ttl.setAttribute('x',16); ttl.setAttribute('y',27);
+  ttl.setAttribute('fill','#e8eef9'); ttl.setAttribute('font-family','sans-serif'); ttl.setAttribute('font-size',16); ttl.setAttribute('font-weight','700');
+  ttl.textContent=document.getElementById('nestTitle').textContent; clone.appendChild(ttl);
+  const wm=document.createElementNS(NS,'text'); wm.setAttribute('x',W-12); wm.setAttribute('y',H-12); wm.setAttribute('text-anchor','end');
+  wm.setAttribute('fill','#5e6f92'); wm.setAttribute('font-family','sans-serif'); wm.setAttribute('font-size',11);
+  wm.textContent='Nested Countries'; clone.appendChild(wm);
+  const url=URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)],{type:'image/svg+xml;charset=utf-8'}));
+  const img=new Image();
+  img.onload=()=>{ const sc=2, cv=document.createElement('canvas'); cv.width=W*sc; cv.height=H*sc;
+    const ctx=cv.getContext('2d'); ctx.scale(sc,sc); ctx.drawImage(img,0,0); URL.revokeObjectURL(url);
+    cv.toBlob(b=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(b);
+      a.download='nested-countries.png'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1500); }); };
+  img.onerror=()=>{ URL.revokeObjectURL(url); alert('PNG export failed in this browser.'); };
+  img.src=url;
+}
+
+// ============ chain list / controls / status / link table ============
+function selectIdx(i){ selected=(i>=1?i:-1); renderChain(); renderNest(); }
+
+function renderChain(){
+  const ids=chain;
+  const cl=d3.select('#chainList'); cl.selectAll('*').remove();
+  ids.forEach((id,i)=>{ const row=cl.append('div').attr('class','ci'+(i===selected?' sel':''))
+      .on('click',(ev)=>{ if(ev.target.classList.contains('ordbtn')||ev.target.classList.contains('x'))return; selectIdx(i); });
+    const ord=row.append('span').attr('class','ord');
+    ord.append('span').attr('class','ordbtn').html('▲').on('click',()=>move(i,-1));
+    ord.append('span').attr('class','ordbtn').html('▼').on('click',()=>move(i,1));
+    row.append('span').attr('class','sw').style('background',color(i,Math.max(ids.length,2)));
+    row.append('span').attr('class','nm').text((i+1)+'. '+nm(id));
+    if(i>0){ const st=linkStatus(i);
+      const cls = st.src==='solver'?'ok':(st.fits?(st.src==='manual'?'man':'ok'):'bad');
+      row.append('span').attr('class','lk '+cls).text(st.src==='solver'?'✓':(st.fits?'✓':'✗')); }
+    row.append('span').attr('class','x').text('✕').on('click',()=>{ chain.splice(i,1); manual={}; if(selected>=chain.length)selected=-1; update(); });
+  });
+  renderControls();
+  let validLinks=0,minc=Infinity;
+  for(let i=1;i<ids.length;i++){ const st=linkStatus(i); if(st.fits){validLinks++; if(st.clr!=null)minc=Math.min(minc,st.clr);} }
+  const all = ids.length>=2 && validLinks===ids.length-1;
+  d3.select('#status').html(
+    '<b>'+ids.length+'</b> countries · '+(ids.length>=2?('<b>'+validLinks+'</b>/'+(ids.length-1)+' links fit'):'add another to test')+
+    (ids.length>=2?(all?' · <span style="color:var(--ok)">complete chain ✓</span>':' · <span style="color:var(--bad)">breaks somewhere</span>'):'')+
+    (isFinite(minc)?'<br>min solver clearance <b>'+minc.toFixed(2)+' km</b>':''));
+  const tb=d3.select('#linkTable tbody'); tb.selectAll('*').remove();
+  for(let i=1;i<ids.length;i++){ const st=linkStatus(i), lt=localT(i), tr=tb.append('tr');
+    tr.append('td').text(i);
+    tr.append('td').text(nm(ids[i-1])+' → '+nm(ids[i]));
+    tr.append('td').html(st.fits?'<span style="color:var(--ok)">fits</span>':'<span style="color:var(--bad)">no</span>');
+    tr.append('td').text(st.src);
+    tr.append('td').attr('class','num').text(lt.ang.toFixed(1));
+    tr.append('td').attr('class','num').text(lt.tx.toFixed(0));
+    tr.append('td').attr('class','num').text(lt.ty.toFixed(0));
+    tr.append('td').attr('class','num').text(st.clr!=null?st.clr.toFixed(2):'—');
+  }
+}
+
+function renderControls(){ const box=d3.select('#controls');
+  if(selected<1||selected>=chain.length){ box.style('display','none'); return; }
+  box.style('display','block').selectAll('*').remove();
+  const i=selected, st=linkStatus(i), lt=localT(i);
+  box.append('div').attr('class','hd').html('Hand-place <b>'+nm(chain[i])+'</b> inside <b>'+nm(chain[i-1])+'</b>');
+  const grp=box.append('div').attr('class','grp');
+  const rot=grp.append('div').attr('class','rot');
+  rot.append('button').html('↺ −'+STEP_ANG+'°').on('click',()=>rotateSel(-STEP_ANG));
+  rot.append('button').html('↻ +'+STEP_ANG+'°').on('click',()=>rotateSel(STEP_ANG));
+  const pad=grp.append('div').attr('class','pad');
+  const mk=(t,dx,dy)=>pad.append('button').html(t).on('click',()=>moveSel(dx,dy));
+  pad.append('span').attr('class','sp'); mk('↑',0,STEP_KM); pad.append('span').attr('class','sp');
+  mk('←',-STEP_KM,0); pad.append('span').attr('class','sp'); mk('→',STEP_KM,0);
+  pad.append('span').attr('class','sp'); mk('↓',0,-STEP_KM); pad.append('span').attr('class','sp');
+  grp.append('button').attr('class','ghost').html('⟲ Auto').on('click',resetSel);
+  box.append('div').attr('class','meta').html(
+    'angle '+lt.ang.toFixed(1)+'°  ·  offset ('+lt.tx.toFixed(0)+', '+lt.ty.toFixed(0)+') km  ·  step '+STEP_ANG+'° / '+STEP_KM+' km'+
+    '<br>'+(st.src==='solver'?'using solver placement (≥ε)':(st.fits?'<span style="color:var(--gold)">hand-placed — geometrically inside</span>':'<span style="color:var(--bad)">hand-placed — overlaps boundary</span>')));
+}
+
+function ensureManual(i){ if(!manual[i]) manual[i]=Object.assign({},localT(i)); return manual[i]; }
+function rotateSel(d){ if(selected<1)return; ensureManual(selected).ang+=d; update(); }
+function moveSel(dx,dy){ if(selected<1)return; const m=ensureManual(selected); m.tx+=dx; m.ty+=dy; update(); }
+function resetSel(){ if(selected<1)return; delete manual[selected]; update(); }
+function move(i,dir){ const j=i+dir; if(j<0||j>=chain.length)return;
+  const t=chain[i]; chain[i]=chain[j]; chain[j]=t; manual={}; selected=(selected===i?j:(selected===j?i:selected)); update(); }
+
+// ============ picker ============
+function pickList(){ return Object.keys(C).filter(id=>!sovereignOnly||C[id].sov).sort((a,b)=>ar(b)-ar(a)); }
+function refreshPicker(){ const dl=d3.select('#countryList'); dl.selectAll('*').remove();
+  const byName={}; pickList().forEach(id=>{ byName[C[id].name.toLowerCase()]=id; dl.append('option').attr('value',C[id].name); });
+  window._byName=byName; }
+function addCountry(){ const v=document.getElementById('search').value.trim().toLowerCase();
+  const id=window._byName[v];
+  if(id && !chain.includes(id)){   // a country can't appear twice in a chain
+    chain.push(id); selected=(chain.length>=2?chain.length-1:-1);
+    document.getElementById('search').value=''; update(); } }
+
+// ============ gallery ============
+function thumb(svgSel,ids){ const T=autoT(ids),k=T.length;
+  let minx=1e15,miny=1e15,maxx=-1e15,maxy=-1e15;
+  for(let i=0;i<k;i++){ const cc=C[ids[i]]; if(!cc)continue; for(const ring of cc.rings) for(const p of ring){
+    const q=applyT(T[i],p); if(q[0]<minx)minx=q[0];if(q[0]>maxx)maxx=q[0];if(q[1]<miny)miny=q[1];if(q[1]>maxy)maxy=q[1]; }}
+  const W=svgSel.node().clientWidth||220,H=130,w=Math.max(maxx-minx,1),h=Math.max(maxy-miny,1),s=Math.min(W/w,H/h)*0.86;
+  const ox=(W-s*(minx+maxx))/2,oy=(H+s*(miny+maxy))/2;
+  const g=svgSel.append('g').attr('transform',`translate(${ox},${oy}) scale(${s},${-s})`);
+  for(let i=0;i<k;i++){ const cc=C[ids[i]];if(!cc)continue;const col=color(i,k);let d='';
+    for(const ring of cc.rings) d+=ringPath(ring,T[i]);
+    g.append('path').attr('d',d).attr('fill',col).attr('fill-opacity',i===0?0.05:0.18)
+      .attr('stroke',col).attr('vector-effect','non-scaling-stroke').attr('stroke-width',1); } }
+function renderGallery(){ const chains=sovereignOnly?DATA.chainsSov:DATA.chainsAll;
+  const g=d3.select('#gallery'); g.selectAll('*').remove();
+  chains.forEach(ch=>{ const card=g.append('div').attr('class','card')
+      .on('click',()=>{ chain=ch.ids.slice(); manual={}; selected=-1; update(); window.scrollTo({top:0,behavior:'smooth'}); });
+    thumb(card.append('svg'), ch.ids);
+    const meta=card.append('div').attr('class','meta');
+    meta.append('span').attr('class','len').text(ch.length+' deep');
+    meta.append('span').text(ch.minClear!=null?ch.minClear.toFixed(2)+' km':'—');
+    card.append('div').attr('class','nm').text(ch.names.join(' → ')); }); }
+
+// ============ step-by-step builder ============
+let builderQuery='';
+
+function renderBuilder(){
+  const last = chain.length ? chain[chain.length-1] : null;
+
+  // breadcrumb: each step truncates the chain back to that point
+  const cr=d3.select('#crumb'); cr.selectAll('*').remove();
+  if(!chain.length){ cr.append('span').attr('class','empty').text('Start by picking any country below'); }
+  chain.forEach((id,i)=>{
+    if(i) cr.append('span').attr('class','arr').text('→');
+    cr.append('span').attr('class','step'+(i===chain.length-1?' last':''))
+      .text((i+1)+'. '+nm(id))
+      .on('click',()=>{ chain=chain.slice(0,i+1); for(const k in manual) if(+k>i) delete manual[k];
+        selected=(chain.length>=2?chain.length-1:-1); update(); });
+  });
+
+  // candidate options = countries that fit inside `last` (or all, if starting)
+  const inChain=new Set(chain);
+  let cands;
+  if(!last){ cands = Object.keys(C); }
+  else { cands = Object.keys(ADJ[last]||{}); }
+  cands = cands.filter(id => C[id] && !inChain.has(id) && (!sovereignOnly || C[id].sov));
+  const q=builderQuery.trim().toLowerCase();
+  if(q) cands = cands.filter(id => nm(id).toLowerCase().includes(q));
+  cands.sort((a,b)=> ar(b)-ar(a));
+
+  d3.select('#candCount').text(
+    !last ? cands.length+' countries — pick a starting (outer) country'
+          : cands.length+' countries fit inside '+nm(last));
+
+  const grid=d3.select('#builder'); grid.selectAll('*').remove();
+  cands.forEach(id=>{
+    const e = last ? edge(last,id) : null;
+    const card=grid.append('div').attr('class','cand')
+      .on('click',()=>{ chain.push(id); selected=(chain.length>=2?chain.length-1:-1); update(); });
+    card.append('span').attr('class','dot').style('background',C[id].sov?'#7aa2ff':'#ff77b0');
+    const cn=card.append('div').attr('class','cn');
+    cn.append('div').attr('class','cnm').text(nm(id));
+    cn.append('div').attr('class','cmeta')
+      .text(fmt(ar(id))+' km²'+(e?' · clears '+e[3].toFixed(1)+' km':''));
+    card.append('span').attr('class','plus').text('＋');
+  });
+  if(!cands.length){ grid.append('div').attr('class','muted')
+    .style('grid-column','1 / -1').style('padding','10px')
+    .text(last? 'No country fits inside '+nm(last)+' under the current settings — this is a dead end (try a finer search, or go back).'
+              : 'No countries match your filter.'); }
+}
+
+// ============ charts ============
+function renderLadder(){ const svg=d3.select('#ladder'); svg.selectAll('*').remove();
+  const ids=chain.filter(id=>C[id]); if(!ids.length)return;
+  const W=svg.node().clientWidth,H=280,m={t:10,r:12,b:64,l:48};
+  const x=d3.scaleBand().domain(ids.map((_,i)=>i)).range([m.l,W-m.r]).padding(.2);
+  const y=d3.scaleLog().domain([Math.max(1,d3.min(ids,ar)*.7),d3.max(ids,ar)]).range([H-m.b,m.t]);
+  svg.append('g').attr('class','axis').attr('transform',`translate(0,${H-m.b})`)
+    .call(d3.axisBottom(x).tickFormat(i=>nm(ids[i]).slice(0,10))).selectAll('text')
+    .attr('transform','rotate(-40)').style('text-anchor','end');
+  svg.append('g').attr('class','axis').attr('transform',`translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4,'~s'));
+  svg.append('g').selectAll('rect').data(ids).join('rect')
+    .attr('x',(_,i)=>x(i)).attr('width',x.bandwidth()).attr('y',d=>y(ar(d))).attr('height',d=>H-m.b-y(ar(d)))
+    .attr('rx',3).attr('fill',(_,i)=>color(i,ids.length)); }
+
+function renderHist(){ const svg=d3.select('#hist'); svg.selectAll('*').remove();
+  const vals=[]; for(const o in ADJ) for(const i in ADJ[o]) vals.push(ADJ[o][i][3]); vals.sort(d3.ascending);
+  const W=svg.node().clientWidth,H=280,m={t:10,r:12,b:36,l:44};
+  const x=d3.scaleLinear().domain([0,d3.quantile(vals,.97)||1]).range([m.l,W-m.r]);
+  const bins=d3.bin().domain(x.domain()).thresholds(30)(vals);
+  const y=d3.scaleLinear().domain([0,d3.max(bins,b=>b.length)]).range([H-m.b,m.t]);
+  svg.append('g').attr('class','axis').attr('transform',`translate(0,${H-m.b})`).call(d3.axisBottom(x).ticks(6));
+  svg.append('g').attr('class','axis').attr('transform',`translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4,'~s'));
+  svg.append('g').selectAll('rect').data(bins).join('rect')
+    .attr('x',d=>x(d.x0)+1).attr('width',d=>Math.max(0,x(d.x1)-x(d.x0)-1))
+    .attr('y',d=>y(d.length)).attr('height',d=>H-m.b-y(d.length)).attr('fill','#39e0c4').attr('fill-opacity',.8);
+  svg.append('text').attr('x',W-m.r).attr('y',H-6).attr('text-anchor','end').attr('fill','#5e6f92').attr('font-size',10).text('clearance km'); }
+
+function leaderboard(sel,deg){ const el=d3.select(sel); el.selectAll('*').remove();
+  const items=Object.keys(deg).filter(id=>C[id]&&(!sovereignOnly||C[id].sov)).sort((a,b)=>deg[b]-deg[a]).slice(0,12);
+  const max=d3.max(items,id=>deg[id])||1;
+  items.forEach(id=>{ const b=el.append('div').attr('class','bar');
+    b.append('span').attr('class','lbl').text(nm(id));
+    b.append('div').attr('class','fill').style('width',(deg[id]/max*70)+'%');
+    b.append('span').attr('class','v').text(deg[id]); }); }
+
+function showTip(ev,html){ tip.innerHTML=html; tip.style.opacity=1; tip.style.left=(ev.clientX+14)+'px'; tip.style.top=(ev.clientY+14)+'px'; }
+function hideTip(){ tip.style.opacity=0; }
+
+function update(){ renderChain(); renderNest(); renderLadder(); renderBuilder(); }
+function updateAll(){ refreshPicker(); renderGallery(); leaderboard('#leadOut',outDeg); leaderboard('#leadIn',inDeg); update(); }
+
+document.getElementById('addBtn').onclick=addCountry;
+document.getElementById('search').addEventListener('keydown',e=>{ if(e.key==='Enter') addCountry(); });
+document.getElementById('clearBtn').onclick=()=>{ chain=[]; manual={}; selected=-1; update(); };
+document.getElementById('dlBtn').onclick=downloadNest;
+document.getElementById('backBtn').onclick=()=>{ if(chain.length){ delete manual[chain.length-1]; chain.pop();
+  selected=(chain.length>=2?chain.length-1:-1); update(); } };
+document.getElementById('clearBtn2').onclick=()=>{ chain=[]; manual={}; selected=-1; update(); };
+document.getElementById('candSearch').addEventListener('input',e=>{ builderQuery=e.target.value; renderBuilder(); });
+document.getElementById('loadLongest').onclick=()=>{ const cs=sovereignOnly?DATA.chainsSov:DATA.chainsAll;
+  if(cs[0]){ chain=cs[0].ids.slice(); manual={}; selected=-1; update(); } };
+const sw=document.getElementById('sovSwitch');
+if(!DATA.sovAvailable){ sw.parentElement.style.display='none'; }
+sw.onclick=()=>{ sovereignOnly=!sovereignOnly; sw.classList.toggle('on',sovereignOnly);
+  document.getElementById('chipLong').textContent = sovereignOnly?DATA.meta.longestSov:DATA.meta.longestAll;
+  const cs=sovereignOnly?DATA.chainsSov:DATA.chainsAll; if(cs[0]){ chain=cs[0].ids.slice(); manual={}; selected=-1; }
+  updateAll(); };
+
+renderHist();
+updateAll();
+window.addEventListener('resize',()=>{ renderNest(); renderLadder(); renderHist(); });
+</script>
+</body>
+</html>
